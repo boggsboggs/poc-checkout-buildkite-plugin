@@ -18,6 +18,9 @@ echo "~~~ Git S3 Cache"
 if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
   echo "Need to download or clone ${REPO_NAME}"
 
+  # Make sure the checkout directory exists
+  mkdir -p $BUILDKITE_BUILD_CHECKOUT_PATH
+
   # Check if repo cache exists
   if aws s3 ls s3://com.rippling.cde-backup/boggsboggs/git-cache/rippling-main.git.tar >/tmp/s3-ls; then
     # Check how old the cache is
