@@ -24,10 +24,10 @@ if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
 
     echo "Running git clone..."
     ssh-keyscan github.com >> ~/.ssh/known_hosts # Add github.com to known_hosts
-    git clone --progress --verbose $BUILDKITE_GIT_CLONE_FLAGS "$BUILDKITE_REPO" "$BUILDKITE_BUILD_CHECKOUT_PATH"
+    git clone $BUILDKITE_GIT_CLONE_FLAGS "$BUILDKITE_REPO" "$BUILDKITE_BUILD_CHECKOUT_PATH"
 
     echo "Updating S3 Cache..."
-    tar -cxf "$TMP_STORAGE_PATH" "$BUILDKITE_BUILD_CHECKOUT_PATH"
+    tar -cvf "$TMP_STORAGE_PATH" "$BUILDKITE_BUILD_CHECKOUT_PATH"
     s3 cp "$TMP_STORAGE_PATH" "$S3_REPO_PATH"
     exit 0
   fi
