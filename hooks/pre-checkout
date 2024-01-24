@@ -14,7 +14,7 @@ TMP_STORAGE_DIR="/tmp/git-cache-tmp-repo-storage"
 TMP_STORAGE_PATH="${TMP_STORAGE_DIR}/${REPO_NAME}.tar"
 
 
-if ! [ -f "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
+if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
   echo "Need to download or clone ${REPO_NAME}"
 
   # Try to download it from S3
