@@ -19,7 +19,7 @@ if ! [ -f "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
 
   # Try to download it from S3
   echo "Attempting S3 download..."
-  if ! aws s3 cp "$S3_REPO_PATH" "$TMP_STORAGE_PATH"
+  if ! aws s3 cp "$S3_REPO_PATH" "$TMP_STORAGE_PATH"; then
     echo "Failed to download from S3."
     echo "Running git clone..."
     git clone $BUILDKITE_GIT_CLONE_FLAGS "$BUILDKITE_REPO" "$BUILDKITE_BUILD_CHECKOUT_PATH"
