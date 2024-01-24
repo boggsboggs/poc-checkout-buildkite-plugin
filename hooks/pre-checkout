@@ -11,30 +11,42 @@ S3_CACHE_ROOT="s3://com.rippling.cde-backup/boggsboggs/git-cache"
 S3_REPO_PATH="${S3_CACHE_ROOT}/${REPO_NAME}.tar"
 TMP_STORAGE_PATH="/tmp/${REPO_NAME}.tar"
 
+CACHE_TTL=600 # Seconds
+
+echo "--- Git S3 Cache"
 
 if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
   echo "Need to download or clone ${REPO_NAME}"
 
-  # Try to download it from S3
-  echo "Attempting S3 download..."
-  if ! aws s3 cp "$S3_REPO_PATH" "$TMP_STORAGE_PATH"; then
-    echo "Failed to download from S3."
+  # Check if repo cache exists
+  if aws s3 ls s3://com.rippling.cde-backup/boggsboggs/git-cache/rippling-main.git.tar >/tmp/s3-ls; then
+    # Check how old the cache is
+    modify_datetime=$(cut -d ' ' -f 1,2 /tmp/s3-ls)
+    modify_epoch=date -d "$modify_datetime" +%s
+    now_epoch=$(date +%s)
+    if [ $((end-start)) -lt $CACHE_TTL ]; then
+      # Download from cache
+      echo "Attempting S3 download..."
+      aws s3 cp "$S3_REPO_PATH" "$TMP_STORAGE_PATH"
 
-    echo "Running git clone..."
-    ssh-keyscan github.com >> ~/.ssh/known_hosts # Add github.com to known_hosts
-    git clone $BUILDKITE_GIT_CLONE_FLAGS "$BUILDKITE_REPO" "$BUILDKITE_BUILD_CHECKOUT_PATH"
-
-    echo "Updating S3 Cache..."
-    # Make an archive of contents of "$BUILDKITE_BUILD_CHECKOUT_PATH" relative to "$BUILDKITE_BUILD_CHECKOUT_PATH"
-    tar -cf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH" .
-    aws s3 cp "$TMP_STORAGE_PATH" "$S3_REPO_PATH"
-    exit 0
+      echo "Unarchiving..."
+      # Restore the git repo archive into "$BUILDKITE_BUILD_CHECKOUT_PATH"
+      tar -xf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH"
+      echo "Done."
+    else
+      echo "S3 Git Cache for ${REPO_NAME} is $((end-start)) seconds old, greater than cache value $CACHE_TTL seconds, refreshing it..."
+    fi
+  else
+    echo "S3 Git Cache for ${REPO_NAME} does not exist, creating it..."
   fi
+  echo "Running git clone..."
+  ssh-keyscan github.com >> ~/.ssh/known_hosts # Add github.com to known_hosts
+  git clone $BUILDKITE_GIT_CLONE_FLAGS "$BUILDKITE_REPO" "$BUILDKITE_BUILD_CHECKOUT_PATH"
 
-  echo "Unarchiving..."
-  # Restore the git repo archive into "$BUILDKITE_BUILD_CHECKOUT_PATH"
-  tar -xf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH"
-  echo "Done."
+  echo "Updating S3 Cache..."
+  # Make an archive of contents of "$BUILDKITE_BUILD_CHECKOUT_PATH" relative to "$BUILDKITE_BUILD_CHECKOUT_PATH"
+  tar -cf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH" .
+  aws s3 cp "$TMP_STORAGE_PATH" "$S3_REPO_PATH"
 else
   echo "Git repo already exists at $BUILDKITE_BUILD_CHECKOUT_PATH/.git, nothing to do."
 fi
