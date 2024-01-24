@@ -37,12 +37,14 @@ if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
       # Restore the git repo archive into "$BUILDKITE_BUILD_CHECKOUT_PATH"
       tar -xf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH"
       echo "Done."
+      exit 0
     else
       echo "S3 Git Cache for ${REPO_NAME} is $age seconds old, greater than cache value $CACHE_TTL seconds, refreshing it..."
     fi
   else
     echo "S3 Git Cache for ${REPO_NAME} does not exist, creating it..."
   fi
+
   echo "Running git clone..."
   ssh-keyscan github.com >> ~/.ssh/known_hosts # Add github.com to known_hosts
   git clone $BUILDKITE_GIT_CLONE_FLAGS "$BUILDKITE_REPO" "$BUILDKITE_BUILD_CHECKOUT_PATH"
