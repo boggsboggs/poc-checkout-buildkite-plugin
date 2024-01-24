@@ -2,5 +2,5 @@
 
 set -euo pipefail
 
-echo 'Sleeping...'
-sleep 10000000
+# echo 'Sleeping...'
+# sleep 10000000
