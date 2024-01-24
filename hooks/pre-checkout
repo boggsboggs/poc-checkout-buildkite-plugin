@@ -21,8 +21,8 @@ if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
   # Check if repo cache exists
   if aws s3 ls s3://com.rippling.cde-backup/boggsboggs/git-cache/rippling-main.git.tar >/tmp/s3-ls; then
     # Check how old the cache is
-    modify_datetime=$(cut -d ' ' -f 1,2 /tmp/s3-ls)
-    modify_epoch=date -d "$modify_datetime" +%s
+    modify_datetime="$(cut -d ' ' -f 1,2 /tmp/s3-ls)"
+    modify_epoch=$(date -d "$modify_datetime" +%s)
     now_epoch=$(date +%s)
     if [ $((end-start)) -lt $CACHE_TTL ]; then
       # Download from cache
