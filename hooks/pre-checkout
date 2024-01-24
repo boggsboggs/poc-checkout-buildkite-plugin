@@ -8,7 +8,7 @@ set -x
 REPO_NAME=${BUILDKITE_REPO##*/} #Strip up to the last '/'
 
 S3_CACHE_ROOT="s3://com.rippling.cde-backup/boggsboggs/git-cache"
-S3_REPO_PATH="${S3_CACHE_ROOT}/${REPO_NAME}"
+S3_REPO_PATH="${S3_CACHE_ROOT}/${REPO_NAME}.tar"
 TMP_STORAGE_PATH="/tmp/${REPO_NAME}.tar"
 
 
@@ -31,7 +31,7 @@ if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
   fi
 
   echo "Unarchiving..."
-  tar -xf "$TMP_STORAGE_PATH" "$BUILDKITE_BUILD_CHECKOUT_PATH"
+  tar -xf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH"
   echo "Done."
 else
   echo "Git repo already exists at $BUILDKITE_BUILD_CHECKOUT_PATH/.git, nothing to do."
