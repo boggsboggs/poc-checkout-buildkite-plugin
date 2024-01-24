@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+set -x
+
+echo "Checking integration permissions..."
+aws sts get-caller-identity
+aws s3 ls s3://com.rippling.cde-backup/boggsboggs/
+
+git clone git@github.com:Rippling/rippling-main.git
+
+ls $BUILDKITE_GIT_MIRRORS_PATH
+
+echo $BUILDKITE_COMMIT
+echo $BUILDKITE_BUILD_CHECKOUT_PATH
+
+ls $BUILDKITE_BUILD_CHECKOUT_PATH
+
+ls $BUILDKITE_BUILD_CHECKOUT_PATH/.git
