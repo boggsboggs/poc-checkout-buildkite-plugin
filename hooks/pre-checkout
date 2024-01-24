@@ -13,7 +13,7 @@ TMP_STORAGE_PATH="/tmp/${REPO_NAME}.tar"
 
 CACHE_TTL=600 # Seconds
 
-echo "--- Git S3 Cache"
+echo "~~~ Git S3 Cache"
 
 if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
   echo "Need to download or clone ${REPO_NAME}"
