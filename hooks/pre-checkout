@@ -25,13 +25,13 @@ if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
     git clone $BUILDKITE_GIT_CLONE_FLAGS "$BUILDKITE_REPO" "$BUILDKITE_BUILD_CHECKOUT_PATH"
 
     echo "Updating S3 Cache..."
-    tar -cvf "$TMP_STORAGE_PATH" "$BUILDKITE_BUILD_CHECKOUT_PATH"
-    s3 cp "$TMP_STORAGE_PATH" "$S3_REPO_PATH"
+    tar -cf "$TMP_STORAGE_PATH" "$BUILDKITE_BUILD_CHECKOUT_PATH"
+    aws s3 cp "$TMP_STORAGE_PATH" "$S3_REPO_PATH"
     exit 0
   fi
 
   echo "Unarchiving..."
-  tar -xvf "$TMP_STORAGE_PATH" "$BUILDKITE_BUILD_CHECKOUT_PATH"
+  tar -xf "$TMP_STORAGE_PATH" "$BUILDKITE_BUILD_CHECKOUT_PATH"
   echo "Done."
 else
   echo "Git repo already exists at $BUILDKITE_BUILD_CHECKOUT_PATH/.git, nothing to do."
