@@ -9,9 +9,7 @@ REPO_NAME=${BUILDKITE_REPO##*/} #Strip up to the last '/'
 
 S3_CACHE_ROOT="s3://com.rippling.cde-backup/boggsboggs/git-cache"
 S3_REPO_PATH="${S3_CACHE_ROOT}/${REPO_NAME}"
-
-TMP_STORAGE_DIR="/tmp/git-cache-tmp-repo-storage"
-TMP_STORAGE_PATH="${TMP_STORAGE_DIR}/${REPO_NAME}.tar"
+TMP_STORAGE_PATH="/tmp/${REPO_NAME}.tar"
 
 
 if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
