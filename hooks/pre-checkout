@@ -24,7 +24,8 @@ if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
     modify_datetime="$(cut -d ' ' -f 1,2 /tmp/s3-ls)"
     modify_epoch=$(date -d "$modify_datetime" +%s)
     now_epoch=$(date +%s)
-    if [ $((end-start)) -lt $CACHE_TTL ]; then
+    age=$((now_epoch-modify_epoch))
+    if [ $age -lt $CACHE_TTL ]; then
       # Download from cache
       echo "Attempting S3 download..."
       aws s3 cp "$S3_REPO_PATH" "$TMP_STORAGE_PATH"
@@ -34,7 +35,7 @@ if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
       tar -xf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH"
       echo "Done."
     else
-      echo "S3 Git Cache for ${REPO_NAME} is $((end-start)) seconds old, greater than cache value $CACHE_TTL seconds, refreshing it..."
+      echo "S3 Git Cache for ${REPO_NAME} is $age seconds old, greater than cache value $CACHE_TTL seconds, refreshing it..."
     fi
   else
     echo "S3 Git Cache for ${REPO_NAME} does not exist, creating it..."
