@@ -132,6 +132,6 @@ update_cache() {
 }
 
 # Don't execute when sourced
-if [[ ${BATS_TESTING} != 'true' ]]; then
+if [[ ${BATS_TESTING:-false} != 'true' ]]; then
     main
 fi
