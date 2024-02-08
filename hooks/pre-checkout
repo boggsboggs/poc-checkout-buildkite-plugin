@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
+# There are unit tests for this file in tests/pre-checkout.bats
 
 set -euo pipefail
-
-set -x
 
 ### Config
 GIT_CACHE_READ_ENABLED=${GIT_CACHE_READ_ENABLED:-true}
@@ -27,6 +26,8 @@ GIT_CACHE_S3_CACHE_PREFIX='boggsboggs/git-cache'
 GIT_CACHE_UPDATE_PERIOD_SECONDS=600
 
 ### Global variables
+BUILDKITE_GIT_CLONE_FLAGS=${BUILDKITE_GIT_CLONE_FLAGS:-}
+
 # Example BUILDKITE_REPO="git@github.com:Rippling/rippling-main.git"
 REPO_NAME=${BUILDKITE_REPO##*/} #Strip up to the last '/'
 
@@ -44,9 +45,9 @@ main () {
   if [[ $CACHE_CONDITION = 'noop' ]]; then
     echo "Nothing to do."
   elif [[ $CACHE_CONDITION = 'read' ]]; then
-    cache_read
+    read_cache
   elif [[ $CACHE_CONDITION = 'update' ]]; then
-    cache_update
+    update_cache
   else
     echo "Bad value for CACHE_CONDITION: ${CACHE_CONDITION}" >&2
     exit 1
@@ -130,4 +131,7 @@ update_cache() {
   aws s3 cp "${TMP_STORAGE_ARCHIVE_PATH}" "${S3_CACHE_REPO_PATH}"
 }
 
-main
+# Don't execute when sourced
+if [ "$0" = "$BASH_SOURCE" ] ; then
+    main
+fi
