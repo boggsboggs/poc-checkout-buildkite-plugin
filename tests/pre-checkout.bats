@@ -6,6 +6,7 @@ export BUILDKITE_BUILD_CHECKOUT_PATH=/tmp/test-checkout-path
 export BUILDKITE_REPO="git@github.com:Rippling/rippling-main.git"
 
 setup() {
+  export BATS_TESTING=true
   # Make checkout dir an empty directory
   if [[ -d $BUILDKITE_BUILD_CHECKOUT_PATH ]]; then
     rm -rf $BUILDKITE_BUILD_CHECKOUT_PATH

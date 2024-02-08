@@ -132,6 +132,6 @@ update_cache() {
 }
 
 # Don't execute when sourced
-if [ "$0" = "$BASH_SOURCE" ] ; then
+if [[ ${BATS_TESTING} != 'true' ]]; then
     main
 fi
