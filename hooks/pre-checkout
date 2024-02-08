@@ -5,21 +5,21 @@ set -euo pipefail
 set -x
 
 ### Config
-GIT_CACHE_READ_ENABLED=${GIT_CACHE_READ_ENABLED:true}
-GIT_CACHE_UPDATE_ENABLED=${GIT_CACHE_UPDATE_ENABLED:true}
-GIT_CACHE_S3_BUCKET=${GIT_CACHE_S3_BUCKET:com.rippling.git-cache}
-GIT_CACHE_S3_CACHE_PREFIX=${GIT_CACHE_S3_CACHE_PREFIX:git-cache/}
-GIT_CACHE_TMP_STORAGE=${GIT_CACHE_TMP_STORAGE:/tmp}
+GIT_CACHE_READ_ENABLED=${GIT_CACHE_READ_ENABLED:-true}
+GIT_CACHE_UPDATE_ENABLED=${GIT_CACHE_UPDATE_ENABLED:-true}
+GIT_CACHE_S3_BUCKET=${GIT_CACHE_S3_BUCKET:-com.rippling.git-cache}
+GIT_CACHE_S3_CACHE_PREFIX=${GIT_CACHE_S3_CACHE_PREFIX:-git-cache/}
+GIT_CACHE_TMP_STORAGE=${GIT_CACHE_TMP_STORAGE:-/tmp}
 
 # If the cache is newer than this value, then don't update it
-GIT_CACHE_UPDATE_PERIOD_SECONDS=${GIT_CACHE_UPDATE_PERIOD_SECONDS:3600}
+GIT_CACHE_UPDATE_PERIOD_SECONDS=${GIT_CACHE_UPDATE_PERIOD_SECONDS:-3600}
 
 # If the cache is older than `GIT_CACHE_UPDATE_PERIOD_SECONDS`,
 # then update it, even if there is already a copy of the repo on the machine.
 # This setting facilitates running a cache update code path on the master-cache pipeline that allows
 # `GIT_CACHE_UPDATE_ENABLED=0` on rippling_main_pr_tests. Without it, the cache would not be updated when
 # master-cache jobs ran on machines that already had a local copy of the repo.
-GIT_CACHE_UPDATE_FORCE=${GIT_CACHE_UPDATE_FORCE:false}
+GIT_CACHE_UPDATE_FORCE=${GIT_CACHE_UPDATE_FORCE:-false}
 
 ### POC Overrides
 GIT_CACHE_S3_BUCKET='com.rippling.cde-backup'
@@ -37,8 +37,6 @@ TMP_STORAGE_S3_LS_OUTPUT="${GIT_CACHE_TMP_STORAGE}/git-cache-s3-ls-output"
 # Execute the git cache hook behavior
 main () {
   echo "~~~ Git S3 Cache"
-  GIT_CACHE_READ_ENABLED=${GIT_CACHE_READ_ENABLED:true}
-  GIT_CACHE_UPDATE_ENABLED
 
   CACHE_CONDITION=''
   set_cache_condition
