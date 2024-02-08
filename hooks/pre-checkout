@@ -4,55 +4,132 @@ set -euo pipefail
 
 set -x
 
+### Config
+GIT_CACHE_READ_ENABLED=${GIT_CACHE_READ_ENABLED:true}
+GIT_CACHE_UPDATE_ENABLED=${GIT_CACHE_UPDATE_ENABLED:true}
+GIT_CACHE_S3_BUCKET=${GIT_CACHE_S3_BUCKET:com.rippling.git-cache}
+GIT_CACHE_S3_CACHE_PREFIX=${GIT_CACHE_S3_CACHE_PREFIX:git-cache/}
+GIT_CACHE_TMP_STORAGE=${GIT_CACHE_TMP_STORAGE:/tmp}
+
+# If the cache is newer than this value, then don't update it
+GIT_CACHE_UPDATE_PERIOD_SECONDS=${GIT_CACHE_UPDATE_PERIOD_SECONDS:3600}
+
+# If the cache is older than `GIT_CACHE_UPDATE_PERIOD_SECONDS`,
+# then update it, even if there is already a copy of the repo on the machine.
+# This setting facilitates running a cache update code path on the master-cache pipeline that allows
+# `GIT_CACHE_UPDATE_ENABLED=0` on rippling_main_pr_tests. Without it, the cache would not be updated when
+# master-cache jobs ran on machines that already had a local copy of the repo.
+GIT_CACHE_UPDATE_FORCE=${GIT_CACHE_UPDATE_FORCE:false}
+
+### POC Overrides
+GIT_CACHE_S3_BUCKET='com.rippling.cde-backup'
+GIT_CACHE_S3_CACHE_PREFIX='boggsboggs/git-cache'
+GIT_CACHE_UPDATE_PERIOD_SECONDS=600
+
+### Global variables
 # Example BUILDKITE_REPO="git@github.com:Rippling/rippling-main.git"
 REPO_NAME=${BUILDKITE_REPO##*/} #Strip up to the last '/'
 
-S3_CACHE_ROOT="s3://com.rippling.cde-backup/boggsboggs/git-cache"
-S3_REPO_PATH="${S3_CACHE_ROOT}/${REPO_NAME}.tar"
-TMP_STORAGE_PATH="/tmp/${REPO_NAME}.tar"
+S3_CACHE_REPO_PATH="s3://${GIT_CACHE_S3_BUCKET}/${GIT_CACHE_S3_CACHE_PREFIX}/${REPO_NAME}.tar"
+TMP_STORAGE_ARCHIVE_PATH="${GIT_CACHE_TMP_STORAGE}/${REPO_NAME}.tar"
+TMP_STORAGE_S3_LS_OUTPUT="${GIT_CACHE_TMP_STORAGE}/git-cache-s3-ls-output"
 
-CACHE_TTL=600 # Seconds
+# Execute the git cache hook behavior
+main () {
+  echo "~~~ Git S3 Cache"
+  GIT_CACHE_READ_ENABLED=${GIT_CACHE_READ_ENABLED:true}
+  GIT_CACHE_UPDATE_ENABLED
 
-echo "~~~ Git S3 Cache"
+  CACHE_CONDITION=''
+  set_cache_condition
 
-if ! [ -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]; then
-  echo "Need to download or clone ${REPO_NAME}"
+  if [[ $CACHE_CONDITION = 'noop' ]]; then
+    echo "Nothing to do."
+  elif [[ $CACHE_CONDITION = 'read' ]]; then
+    cache_read
+  elif [[ $CACHE_CONDITION = 'update' ]]; then
+    cache_update
+  else
+    echo "Bad value for CACHE_CONDITION: ${CACHE_CONDITION}" >&2
+    exit 1
+  fi
+}
 
-  # Make sure the checkout directory exists
-  mkdir -p $BUILDKITE_BUILD_CHECKOUT_PATH
-
-  # Check if repo cache exists
-  if aws s3 ls s3://com.rippling.cde-backup/boggsboggs/git-cache/rippling-main.git.tar >/tmp/s3-ls; then
-    # Check how old the cache is
-    modify_datetime="$(cut -d ' ' -f 1,2 /tmp/s3-ls)"
+# Sets CACHE_CONDITION to one of noop, read, update
+set_cache_condition () {
+  # Does the cache exist in S3? How old is it?
+  local cache_exists='false'
+  local cache_age=''
+  if aws s3 ls "${S3_CACHE_REPO_PATH}" >"${TMP_STORAGE_S3_LS_OUTPUT}"; then
+    modify_datetime="$(cut -d ' ' -f 1,2 ${TMP_STORAGE_S3_LS_OUTPUT})"
     modify_epoch=$(date -d "$modify_datetime" +%s)
     now_epoch=$(date +%s)
-    age=$((now_epoch-modify_epoch))
-    if [ $age -lt $CACHE_TTL ]; then
-      # Download from cache
-      echo "Attempting S3 download..."
-      aws s3 cp "$S3_REPO_PATH" "$TMP_STORAGE_PATH"
 
-      echo "Unarchiving..."
-      # Restore the git repo archive into "$BUILDKITE_BUILD_CHECKOUT_PATH"
-      tar -xf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH"
-      echo "Done."
-      exit 0
+    cache_exists='true'
+    cache_age="$((now_epoch-modify_epoch))"
+  fi
+
+  # Does the repo exist on this machine?
+  local repo_exists='false'
+  if [[ -d "${BUILDKITE_BUILD_CHECKOUT_PATH}/.git" ]]; then
+    repo_exists='true'
+  fi
+
+  # The first condition is a short-circuit: if the repo exists and FORCE_UPDATE = 'false' then no-op
+  # The second and third condition divide possible values for cache_exists and cache_age into two categories:
+  # 1. Cache exists and is not old => Read
+  # 2. Cache does not exist, or cache does exist and is old => Update
+  # The else is an assertion that should never be executed.
+  # Inside the read and update cases, there's an if that implements GIT_CACHE_READ_ENABLED and $GIT_CACHE_UPDATE_ENABLED
+  if [[ ${repo_exists} = 'true' && ${GIT_CACHE_UPDATE_FORCE} = 'false' ]]; then
+    CACHE_CONDITION='noop'
+  elif [[ ${cache_exists} = 'true' && ${cache_age} -le ${GIT_CACHE_UPDATE_PERIOD_SECONDS} ]]; then
+    if [[ ${GIT_CACHE_READ_ENABLED} = 'true' ]]; then
+      CACHE_CONDITION='read'
     else
-      echo "S3 Git Cache for ${REPO_NAME} is $age seconds old, greater than cache value $CACHE_TTL seconds, refreshing it..."
+      CACHE_CONDITION='noop'
+    fi
+  elif [[ ${cache_exists} = 'false' || (${cache_exists} = 'true' && ${cache_age} -gt ${GIT_CACHE_UPDATE_PERIOD_SECONDS}) ]]; then
+    if [[ ${GIT_CACHE_UPDATE_ENABLED} = 'true' ]]; then
+      CACHE_CONDITION='update'
+    else
+      CACHE_CONDITION='noop'
     fi
   else
-    echo "S3 Git Cache for ${REPO_NAME} does not exist, creating it..."
+    echo "Unexpected conditions matching no case: repo_exists=${repo_exists}, GIT_CACHE_UPDATE_FORCE=${GIT_CACHE_UPDATE_FORCE}, cache_exists=${cache_exists}, cache_age=${cache_age}, GIT_CACHE_UPDATE_PERIOD_SECONDS=${GIT_CACHE_UPDATE_PERIOD_SECONDS}" >&2
+    exit 1
+  fi
+
+
+}
+
+# Execute a cache read, if enabled
+read_cache () {
+  echo "Reading S3 Cache..."
+  aws s3 cp "${S3_CACHE_REPO_PATH}" "${TMP_STORAGE_ARCHIVE_PATH}"
+
+  echo "Un-archiving..."
+  # Restore the git repo archive into "${BUILDKITE_BUILD_CHECKOUT_PATH}"
+  tar -xf "${TMP_STORAGE_ARCHIVE_PATH}" --directory "${BUILDKITE_BUILD_CHECKOUT_PATH}"
+  echo "Done."
+}
+
+# Execute a cache update, if enabled
+update_cache() {
+  echo "Updating S3 Cache..."
+  # If the checkout directory already exists, then remove it.
+  if [[ -d "${BUILDKITE_BUILD_CHECKOUT_PATH}" ]]; then
+    rm -rf "${BUILDKITE_BUILD_CHECKOUT_PATH}"
   fi
 
   echo "Running git clone..."
-  ssh-keyscan github.com >> ~/.ssh/known_hosts # Add github.com to known_hosts
-  git clone $BUILDKITE_GIT_CLONE_FLAGS "$BUILDKITE_REPO" "$BUILDKITE_BUILD_CHECKOUT_PATH"
+  ssh-keyscan github.com >> "${HOME}/.ssh/known_hosts" # Add github.com to known_hosts
+  git clone $BUILDKITE_GIT_CLONE_FLAGS "${BUILDKITE_REPO}" "${BUILDKITE_BUILD_CHECKOUT_PATH}"
 
   echo "Updating S3 Cache..."
   # Make an archive of contents of "$BUILDKITE_BUILD_CHECKOUT_PATH" relative to "$BUILDKITE_BUILD_CHECKOUT_PATH"
-  tar -cf "$TMP_STORAGE_PATH" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH" .
-  aws s3 cp "$TMP_STORAGE_PATH" "$S3_REPO_PATH"
-else
-  echo "Git repo already exists at $BUILDKITE_BUILD_CHECKOUT_PATH/.git, nothing to do."
-fi
+  tar -cf "${TMP_STORAGE_ARCHIVE_PATH}" --directory "$BUILDKITE_BUILD_CHECKOUT_PATH" .
+  aws s3 cp "${TMP_STORAGE_ARCHIVE_PATH}" "${S3_CACHE_REPO_PATH}"
+}
+
+main
